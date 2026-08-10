@@ -1,0 +1,280 @@
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anthropic==0.109.1
+bcrypt==4.2.1
+anyio==4.13.0
+certifi==2026.5.20
+charset-normalizer==3.4.7
+click==8.4.1
+distro==1.9.0
+dnspython==2.8.0
+docstring_parser==0.18.0
+email-validator==2.3.0
+et_xmlfile==2.0.0
+faiss-cpu==1.14.3
+fastapi==0.111.0
+fastapi-cli==0.0.24
+filelock==3.29.4
+fsspec==2026.4.0
+h11==0.16.0
+hdbscan==0.8.40
+hf-xet==1.5.1
+httpcore==1.0.9
+httptools==0.8.0
+httpx==0.28.1
+huggingface_hub==0.36.2
+idna==3.18
+jellyfish==1.2.1
+Jinja2==3.1.6
+jiter==0.15.0
+joblib==1.5.3
+lxml==6.1.1
+markdown-it-py==4.2.0
+MarkupSafe==3.0.3
+mdurl==0.1.2
+matplotlib==3.9.2
+mpmath==1.3.0
+narwhals==2.22.1
+networkx==3.6.1
+numpy==1.26.4
+openpyxl==3.1.5
+orjson==3.11.9
+packaging==26.2
+pandas==3.0.3
+pillow==12.2.0
+plotly==6.8.0
+pydantic==2.13.4
+pydantic_core==2.46.4
+Pygments==2.20.0
+PyMuPDF==1.27.2.3
+python-dateutil==2.9.0.post0
+python-docx==1.1.2
+python-dotenv==1.2.2
+python-multipart==0.0.9
+pytesseract==0.3.13
+PyYAML==6.0.3
+regex==2026.5.9
+requests==2.34.2
+rich==15.0.0
+rich-toolkit==0.20.1
+safetensors==0.8.0
+scikit-learn==1.3.2
+scipy==1.11.4
+sentence-transformers==3.3.1
+shellingham==1.5.4
+six==1.17.0
+sniffio==1.3.1
+spacy==3.8.14
+starlette==0.37.2
+sympy==1.14.0
+threadpoolctl==3.6.0
+tokenizers==0.22.2
+torch==2.2.2
+tqdm==4.68.2
+transformers==4.57.6
+typer==0.26.7
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+ujson==5.12.1
+urllib3==2.7.0
+uvicorn==0.30.1
+uvloop==0.22.1
+watchfiles==1.2.0
+websockets==16.0
+statsmodels==0.14.6
+reportlab==4.2.2
+umap-learn==0.5.6
+patsy==1.0.2
+numba==0.66.0
+llvmlite==0.48.0
+pynndescent==0.6.0
+it-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/it_core_news_lg-3.8.0/it_core_news_lg-3.8.0-py3-none-any.whl
+# ---------------------------------------------------------------------------
+# Licensing (offline license verification): dipendenza nuova rispetto alla v2.6.0
+#   - cryptography : verifica della firma Ed25519 della licenza lato backend
+# La chiave privata non e' mai presente in OBS, solo la chiave pubblica di verifica.
+# ---------------------------------------------------------------------------
+cryptography>=42
+# ---------------------------------------------------------------------------
+# NER (entity graph): due dipendenze nuove rispetto alla v2:
+#   - spacy        : motore di Named Entity Recognition
+#   - jellyfish    : Jaro-Winkler per l'entity resolution
+#
+# Versioni fissate a quelle provate sul venv con numpy 1.26.4 (Mac Intel,
+# Python 3.11). Se ricrei il venv e qualcosa cambia, verifica con:
+#   pip show spacy jellyfish numpy | grep -E "^(Name|Version)"
+# e controlla che numpy resti 1.26.4 (spacy non deve trascinarlo oltre,
+# altrimenti rompe torch/faiss/scipy).
+#
+# I MODELLI spaCy NON sono pacchetti pip standard: il modello lg (default) e'
+# ora incluso come requirement a URL diretto qui sopra, quindi si installa
+# automaticamente con pip install -r requirements.txt. In alternativa, o per
+# il modello sm di riserva, si scaricano a parte nel venv attivo:
+#   python -m spacy download it_core_news_lg
+#   python -m spacy download it_core_news_sm
+# Il modello attivo si sceglie da backend/.env con SPACY_MODEL
+# (default it_core_news_lg; su Mac Intel: SPACY_MODEL=it_core_news_sm).
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# NER (entity graph): two new dependencies compared to v2:
+#   - spacy        : Named Entity Recognition engine
+#   - jellyfish    : Jaro-Winkler for entity resolution
+#
+# Versions pinned to those tested in the virtual environment with numpy 1.26.4
+# (Mac Intel, Python 3.11). If you recreate the virtual environment and
+# something changes, verify with:
+#   pip show spacy jellyfish numpy | grep -E "^(Name|Version)"
+# and make sure numpy remains at 1.26.4 (spacy must not pull it to a newer
+# version, otherwise it breaks torch/faiss/scipy).
+#
+# spaCy MODELS are NOT standard pip packages: the lg model (default) is now
+# included as a direct-URL requirement above, so it installs automatically
+# with pip install -r requirements.txt. Alternatively, or for the sm fallback
+# model, download them separately in the active virtual environment:
+#   python -m spacy download it_core_news_lg
+#   python -m spacy download it_core_news_sm
+# The active model is selected from backend/.env via SPACY_MODEL
+# (default: it_core_news_lg; on Mac Intel:
+# SPACY_MODEL=it_core_news_sm).
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Dipendenze di sistema (NON pacchetti pip) su Mac Intel:
+# umap-learn tira numba, che tira llvmlite. Su Mac Intel llvmlite si COMPILA
+# dai sorgenti e richiede due strumenti di sistema, da installare una volta
+# con Homebrew PRIMA di ricreare il venv:
+#   brew install cmake llvm
+# e per far trovare llvm al compilatore, nella stessa shell:
+#   export LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config
+#   export LLVM_DIR=/usr/local/opt/llvm/lib/cmake/llvm
+# Senza questi, l'installazione di llvmlite fallisce con "cmake not found"
+# oppure "Could not find LLVM". Su Mac Apple Silicon i prefissi Homebrew
+# sono sotto /opt/homebrew al posto di /usr/local.
+#
+# patsy, numba, llvmlite e pynndescent sono fissati sopra alle versioni
+# provate sul venv (Mac Intel, Python 3.11) per una ricreazione riproducibile
+# ed evitare installazioni miste di statsmodels (errore deprecate_kwarg).
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# System dependencies (NOT pip packages) on Mac Intel:
+# umap-learn pulls numba, which pulls llvmlite. On Mac Intel llvmlite is
+# COMPILED from source and needs two system tools, to be installed once with
+# Homebrew BEFORE recreating the virtual environment:
+#   brew install cmake llvm
+# and, so the compiler finds llvm, in the same shell:
+#   export LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config
+#   export LLVM_DIR=/usr/local/opt/llvm/lib/cmake/llvm
+# Without these, the llvmlite build fails with "cmake not found" or
+# "Could not find LLVM". On Mac Apple Silicon the Homebrew prefixes are under
+# /opt/homebrew instead of /usr/local.
+#
+# patsy, numba, llvmlite and pynndescent are pinned above to the versions
+# tested on the virtual environment (Mac Intel, Python 3.11) for a
+# reproducible rebuild, avoiding mixed statsmodels installs (deprecate_kwarg
+# error).
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Modello di embedding: preparazione locale e conversione in safetensors.
+# sentence-transformers e' fissato a 3.3.1 (era 2.7.0) perche' la 2.7.0 non
+# supporta i parametri usati per il caricamento locale del modello.
+# Il modello di embedding attivo e' BAAI/bge-m3. Sul branch main del repo e'
+# disponibile solo pytorch_model.bin. transformers 4.57.6 rifiuta di caricare
+# i file .bin quando torch e' inferiore alla 2.6 (CVE-2025-32434):
+#   ValueError: ... upgrade torch to at least v2.6 ...
+# Per questo lo script download_model.py, lanciato una volta dopo pip install
+# (e gia richiamato da start.sh e start.bat):
+#   python download_model.py
+# scarica i file di configurazione e pytorch_model.bin in backend/models/bge-m3,
+# poi converte i pesi in model.safetensors in locale usando safetensors.torch e
+# rimuove il .bin. La lettura del .bin per la conversione usa torch.load con
+# weights_only=True, che funziona su torch 2.2.2. Il risultato e' un modello
+# locale in safetensors, indipendente dalla rete e da come Hugging Face serve i
+# file. backend/main.py, quando la cartella locale esiste, carica il modello da
+# li con local_files_only=True. torch resta alla 2.2.2 e la catena
+# torch/faiss/scipy/numpy non viene toccata.
+#
+# Embedding model: local preparation and conversion to safetensors.
+# sentence-transformers is pinned to 3.3.1 (was 2.7.0) because 2.7.0 does not
+# support the parameters used for local model loading.
+# The active embedding model is BAAI/bge-m3. On the repo main branch only
+# pytorch_model.bin is available. transformers 4.57.6 refuses to load .bin files
+# when torch is older than 2.6 (CVE-2025-32434):
+#   ValueError: ... upgrade torch to at least v2.6 ...
+# For this reason the script download_model.py, run once after pip install
+# (and already called by start.sh and start.bat):
+#   python download_model.py
+# downloads the configuration files and pytorch_model.bin into
+# backend/models/bge-m3, then converts the weights to model.safetensors locally
+# using safetensors.torch and removes the .bin. Reading the .bin for conversion
+# uses torch.load with weights_only=True, which works on torch 2.2.2. The result
+# is a local safetensors model, independent of the network and of how Hugging
+# Face serves files. backend/main.py, when the local folder exists, loads the
+# model from there with local_files_only=True. torch stays at 2.2.2 and the
+# torch/faiss/scipy/numpy chain is left untouched.
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Editor di codice (dalla v2.6.0): NESSUNA dipendenza pip aggiuntiva.
+# Il pannello Code usa solo la libreria standard di Python (subprocess, sqlite3,
+# zipfile, tempfile, threading) e Monaco, caricato da CDN nel browser.
+#
+# Dipendenza di SISTEMA (NON pacchetto pip): Docker.
+# Serve solo per i linguaggi lato server (Python, JavaScript, Java, C, C++,
+# Octave, R). Senza Docker il resto di OBS funziona identico, e HTML e CSS nel
+# pannello Code continuano a funzionare perche' girano nel browser.
+#
+# Installazione per Windows, macOS e Linux: vedi GUIDA_CODICE.md / CODE_GUIDE.md.
+# Verifica rapida:
+#   docker --version
+#   docker info
+#
+# Su Linux, l'utente che lancia OBS deve appartenere al gruppo docker, altrimenti
+# il demone rifiuta i comandi:
+#   sudo usermod -aG docker $USER
+# seguito da logout e login (il cambio di gruppo non vale sulle sessioni aperte).
+#
+# Le immagini dei linguaggi si scaricano dall'interfaccia (tab Code, pulsante
+# Linguaggi), non serve la riga di comando. L'equivalente manuale e':
+#   docker pull python:3.11-slim
+#   docker pull node:20-slim
+#   docker pull eclipse-temurin:21-jdk
+#   docker pull gcc:13
+#   docker pull gnuoctave/octave:9.2.0
+#   docker pull r-base:4.4.1
+# Insieme pesano diversi gigabyte: scaricare solo quelle che servono. C e C++
+# condividono la stessa immagine gcc:13.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Code editor (from v2.6.0): NO additional pip dependencies.
+# The Code panel uses only the Python standard library (subprocess, sqlite3,
+# zipfile, tempfile, threading) and Monaco, loaded from a CDN in the browser.
+#
+# SYSTEM dependency (NOT a pip package): Docker.
+# Needed only for the server-side languages (Python, JavaScript, Java, C, C++,
+# Octave, R). Without Docker the rest of OBS works exactly the same, and HTML and
+# CSS in the Code panel keep working because they run in the browser.
+#
+# Installation for Windows, macOS and Linux: see CODE_GUIDE.md / GUIDA_CODICE.md.
+# Quick check:
+#   docker --version
+#   docker info
+#
+# On Linux, the user running OBS must belong to the docker group, otherwise the
+# daemon refuses commands:
+#   sudo usermod -aG docker $USER
+# followed by a logout and login (a group change does not apply to open sessions).
+#
+# Language images are downloaded from the interface (Code tab, Linguaggi button),
+# no command line needed. The manual equivalent is:
+#   docker pull python:3.11-slim
+#   docker pull node:20-slim
+#   docker pull eclipse-temurin:21-jdk
+#   docker pull gcc:13
+#   docker pull gnuoctave/octave:9.2.0
+#   docker pull r-base:4.4.1
+# Together they weigh several gigabytes: download only the ones you need. C and
+# C++ share the same gcc:13 image.
+# ---------------------------------------------------------------------------

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/png" href="/icons/obs-icon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OBS-LAB - Setup</title>
+<link rel="icon" type="image/png" href="/favicon.ico">
+<style>
+:root{
+  --navy:#3f4d5e; --navy2:#33404e; --navy3:#28323d;
+  --accent:#00009B; --accent2:#0000c4; --accent-soft:#d7d7f2;
+  --bg:#d7d7d7; --panel:#ffffff; --panel2:#e9e9e9;
+  --border:#9a9a9a; --border2:#787878;
+  --text:#0d0d0d; --text2:#3a3a3a; --text3:#6b6b6b;
+  --green:#3f8f3f; --red:#b03a2e;
+  --font:Arial,Helvetica,'Liberation Sans',sans-serif;
+  --data:'Courier New',Courier,'Liberation Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:420px;max-width:100%;background:var(--panel);border:1px solid var(--border2);
+  box-shadow:0 10px 40px rgba(0,0,0,0.32)}
+.card-head{background:var(--navy);padding:18px 22px;border-bottom:2px solid var(--navy3);
+  display:flex;align-items:center;gap:12px}
+.card-head svg{display:block;flex-shrink:0}
+.brand-wrap{display:flex;flex-direction:column;justify-content:center}
+.brand{font-size:14px;font-weight:bold;color:#d6dce2;letter-spacing:0.3px;line-height:1.3}
+.brand-sub{font-size:11px;color:#8aaccb;font-style:italic;margin-top:1px}
+.card-body{padding:24px 22px 20px}
+.welcome{font-size:15px;font-weight:bold;color:var(--text);margin-bottom:2px}
+.welcome-sub{font-size:11px;color:var(--text3);margin-bottom:20px;line-height:1.5}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:bold;letter-spacing:0.2px}
+.field input{width:100%;padding:10px 12px;border:1px solid var(--border);background:#fff;
+  font-family:var(--font);font-size:13px;color:var(--text);transition:border-color .12s,box-shadow .12s}
+.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field input::placeholder{color:#b0b0b0}
+.btn{width:100%;padding:11px;border:1px solid var(--navy3);background:var(--accent);color:#fff;
+  font-family:var(--font);font-size:13px;font-weight:bold;cursor:pointer;letter-spacing:0.4px;
+  margin-top:4px;transition:background .12s}
+.btn:hover{background:var(--accent2)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:0.55;cursor:default;transform:none}
+.msg{margin-top:14px;padding:9px 11px;font-size:12px;display:none;line-height:1.4}
+.msg.err{display:block;background:#f6e4e2;border:1px solid var(--red);color:var(--red)}
+.msg.ok{display:block;background:#e3f0e3;border:1px solid var(--green);color:var(--green)}
+.hint{margin-top:16px;font-size:11px;color:var(--text3);text-align:center;line-height:1.5}
+.foot{padding:11px 22px;border-top:1px solid var(--border);background:var(--panel2);
+  display:flex;align-items:center;justify-content:space-between}
+.foot .ver{font-size:10px;color:var(--text3);font-family:var(--data)}
+.foot .dot{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);font-family:var(--data)}
+.foot .dot i{width:7px;height:7px;border-radius:50%;background:#4acd8a;box-shadow:0 0 4px #4acd8a;display:inline-block}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-head">
+    <svg width="58" height="36" viewBox="0 0 160 160">
+      <text x="46" y="98" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="44" font-weight="800" fill="#fff" letter-spacing="-2">OBS</text>
+    </svg>
+    <div class="brand-wrap">
+      <div class="brand">OBS-LAB</div>
+      <div class="brand-sub">First run setup</div>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div class="welcome">Create the administrator account</div>
+    <div class="welcome-sub">This is the first time OBS runs on this installation. Create the main account you will use to sign in and manage all other users.</div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="you@example.com">
+    </div>
+    <div class="field">
+      <label for="username">Name</label>
+      <input type="text" id="username" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Developer">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="new-password" placeholder="at least 6 characters">
+    </div>
+    <div class="field">
+      <label for="password2">Repeat password</label>
+      <input type="password" id="password2" autocomplete="new-password" placeholder="">
+    </div>
+    <button class="btn" id="setupBtn" onclick="doSetup()">Create account</button>
+    <div class="msg" id="setupMsg"></div>
+    <div class="hint">Keep these credentials safe. You can add more users from inside OBS after signing in.</div>
+  </div>
+
+  <div class="foot">
+    <span class="ver">OBS v2.6.0</span>
+    <span class="dot"><i></i>server online</span>
+  </div>
+</div>
+
+<script>
+function setMsg(text, kind){
+  var m = document.getElementById("setupMsg");
+  m.textContent = text;
+  m.className = "msg " + kind;
+}
+
+function doSetup(){
+  var email = document.getElementById("email").value.trim();
+  var username = document.getElementById("username").value.trim() || "Developer";
+  var pw = document.getElementById("password").value;
+  var pw2 = document.getElementById("password2").value;
+  if(!email || email.indexOf("@") < 0){ setMsg("Enter a valid email.", "err"); return; }
+  if(pw.length < 6){ setMsg("The password must be at least 6 characters.", "err"); return; }
+  if(pw !== pw2){ setMsg("The passwords do not match.", "err"); return; }
+  var btn = document.getElementById("setupBtn");
+  btn.disabled = true;
+  fetch("/api/auth/setup", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({email: email, username: username, password: pw})
+  }).then(function(r){
+    return r.json().then(function(data){ return {ok: r.ok, data: data}; });
+  }).then(function(res){
+    if(res.ok && res.data && res.data.email){
+      setMsg("Account created. Starting OBS.", "ok");
+      setTimeout(function(){ window.location.href = "/"; }, 1000);
+    } else {
+      var reason = (res.data && res.data.detail) ? res.data.detail : "setup failed";
+      setMsg("Setup failed: " + reason, "err");
+      btn.disabled = false;
+    }
+  }).catch(function(){
+    setMsg("Network error during setup.", "err");
+    btn.disabled = false;
+  });
+}
+</script>
+</body>
+</html>

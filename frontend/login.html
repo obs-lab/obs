@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<link rel="icon" type="image/png" href="/icons/obs-icon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OBS-LAB - Login</title>
+<link rel="icon" type="image/png" href="/favicon.ico">
+<style>
+:root{
+  --navy:#3f4d5e; --navy2:#33404e; --navy3:#28323d;
+  --accent:#00009B; --accent2:#0000c4; --accent-soft:#d7d7f2;
+  --bg:#d7d7d7; --panel:#ffffff; --panel2:#e9e9e9;
+  --border:#9a9a9a; --border2:#787878;
+  --text:#0d0d0d; --text2:#3a3a3a; --text3:#6b6b6b;
+  --green:#3f8f3f; --red:#b03a2e;
+  --font:Arial,Helvetica,'Liberation Sans',sans-serif;
+  --mono:Arial,Helvetica,'Liberation Sans',sans-serif;
+  --data:'Courier New',Courier,'Liberation Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:380px;max-width:100%;background:var(--panel);border:1px solid var(--border2);
+  box-shadow:0 10px 40px rgba(0,0,0,0.32)}
+.card-head{background:var(--navy);padding:18px 22px;border-bottom:2px solid var(--navy3);
+  display:flex;align-items:center;gap:12px}
+.card-head svg{display:block;flex-shrink:0}
+.brand-wrap{display:flex;flex-direction:column;justify-content:center}
+.brand{font-size:14px;font-weight:bold;color:#d6dce2;letter-spacing:0.3px;line-height:1.3}
+.brand-sub{font-size:11px;color:#8aaccb;font-style:italic;margin-top:1px}
+.card-body{padding:24px 22px 20px}
+.welcome{font-size:15px;font-weight:bold;color:var(--text);margin-bottom:2px}
+.welcome-sub{font-size:11px;color:var(--text3);margin-bottom:20px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:bold;letter-spacing:0.2px}
+.field input{width:100%;padding:10px 12px;border:1px solid var(--border);background:#fff;
+  font-family:var(--font);font-size:13px;color:var(--text);transition:border-color .12s,box-shadow .12s}
+.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field input::placeholder{color:#b0b0b0}
+.btn{width:100%;padding:11px;border:1px solid var(--navy3);background:var(--accent);color:#fff;
+  font-family:var(--font);font-size:13px;font-weight:bold;cursor:pointer;letter-spacing:0.4px;
+  margin-top:4px;transition:background .12s}
+.btn:hover{background:var(--accent2)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:0.55;cursor:default;transform:none}
+.msg{margin-top:14px;padding:9px 11px;font-size:12px;display:none;line-height:1.4}
+.msg.err{display:block;background:#f6e4e2;border:1px solid var(--red);color:var(--red)}
+.msg.ok{display:block;background:#e3f0e3;border:1px solid var(--green);color:var(--green)}
+.hint{margin-top:16px;font-size:11px;color:var(--text3);text-align:center;line-height:1.5}
+.section-title{font-size:15px;font-weight:bold;color:var(--text);margin-bottom:4px}
+.section-sub{font-size:11px;color:var(--text3);margin-bottom:18px}
+.hidden{display:none}
+.foot{padding:11px 22px;border-top:1px solid var(--border);background:var(--panel2);
+  display:flex;align-items:center;justify-content:space-between}
+.foot .ver{font-size:10px;color:var(--text3);font-family:var(--mono)}
+.foot .dot{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);font-family:var(--mono)}
+.foot .dot i{width:7px;height:7px;border-radius:50%;background:#4acd8a;box-shadow:0 0 4px #4acd8a;display:inline-block}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-head">
+    <svg width="58" height="36" viewBox="0 0 160 160">
+      <text x="46" y="98" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="44" font-weight="800" fill="#fff" letter-spacing="-2">OBS</text>
+    </svg>
+    <div class="brand-wrap">
+      <div class="brand">OBS-LAB</div>
+      <div class="brand-sub">Members Area</div>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div id="loginView">
+      <div class="welcome">Login</div>
+      <div class="welcome-sub">Sign in to continue.</div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="email or username">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" placeholder="">
+      </div>
+      <button class="btn" id="loginBtn" onclick="doLogin()">Sign In</button>
+      <div class="msg" id="loginMsg"></div>
+    </div>
+
+    <div id="changeView" class="hidden">
+      <div class="section-title">Set a new password</div>
+      <div class="section-sub">Scegli una nuova password per il tuo account.</div>
+      <div class="field">
+        <label for="oldPw">Temporary password</label>
+        <input type="password" id="oldPw" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label for="newPw">New password</label>
+        <input type="password" id="newPw" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="newPw2">Confirm new password</label>
+        <input type="password" id="newPw2" autocomplete="new-password">
+      </div>
+      <button class="btn" id="changeBtn" onclick="doChange()">Save and sign in</button>
+      <div class="msg" id="changeMsg"></div>
+      <div class="hint">For your security, your temporary password must be changed immediately.</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="ver">OBS v2.6.0</span>
+    <span class="dot"><i></i>server online</span>
+  </div>
+</div>
+
+<script>
+var pendingEmail = "";
+
+function show(el){ el.classList.remove("hidden"); }
+function hide(el){ el.classList.add("hidden"); }
+function setMsg(id, text, kind){
+  var m = document.getElementById(id);
+  m.textContent = text;
+  m.className = "msg " + kind;
+}
+
+function doLogin(){
+  var email = document.getElementById("email").value.trim();
+  var pw = document.getElementById("password").value;
+  if(!email || !pw){ setMsg("loginMsg","Inserisci email e password.","err"); return; }
+  var btn = document.getElementById("loginBtn");
+  btn.disabled = true;
+  fetch("/api/auth/login", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    credentials:"same-origin",
+    body: JSON.stringify({email:email, password:pw})
+  }).then(function(r){
+    return r.json().then(function(d){ return {ok:r.ok, d:d}; });
+  }).then(function(res){
+    btn.disabled = false;
+    if(!res.ok){ setMsg("loginMsg", res.d.detail || "Accesso non riuscito.", "err"); return; }
+    if(res.d.must_change_pw){
+      pendingEmail = email;
+      document.getElementById("oldPw").value = pw;
+      hide(document.getElementById("loginView"));
+      show(document.getElementById("changeView"));
+      document.getElementById("newPw").focus();
+      return;
+    }
+    window.location.href = "/";
+  }).catch(function(){
+    btn.disabled = false;
+    setMsg("loginMsg","Errore di connessione al server.","err");
+  });
+}
+
+function doChange(){
+  var oldPw = document.getElementById("oldPw").value;
+  var n1 = document.getElementById("newPw").value;
+  var n2 = document.getElementById("newPw2").value;
+  if(!n1 || n1.length < 6){ setMsg("changeMsg","La nuova password deve avere almeno 6 caratteri.","err"); return; }
+  if(n1 !== n2){ setMsg("changeMsg","Le due password non coincidono.","err"); return; }
+  var btn = document.getElementById("changeBtn");
+  btn.disabled = true;
+  fetch("/api/auth/change-password", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    credentials:"same-origin",
+    body: JSON.stringify({old_password:oldPw, new_password:n1})
+  }).then(function(r){
+    return r.json().then(function(d){ return {ok:r.ok, d:d}; });
+  }).then(function(res){
+    btn.disabled = false;
+    if(!res.ok){ setMsg("changeMsg", res.d.detail || "Operazione non riuscita.", "err"); return; }
+    setMsg("changeMsg","Password aggiornata. Effettua di nuovo l'accesso.","ok");
+    setTimeout(function(){
+      hide(document.getElementById("changeView"));
+      show(document.getElementById("loginView"));
+      document.getElementById("password").value = "";
+      document.getElementById("email").value = pendingEmail;
+      setMsg("loginMsg","","");
+      document.getElementById("password").focus();
+    }, 1400);
+  }).catch(function(){
+    btn.disabled = false;
+    setMsg("changeMsg","Errore di connessione al server.","err");
+  });
+}
+
+document.getElementById("password").addEventListener("keydown", function(e){
+  if(e.key === "Enter") doLogin();
+});
+document.getElementById("newPw2").addEventListener("keydown", function(e){
+  if(e.key === "Enter") doChange();
+});
+</script>
+</body>
+</html>

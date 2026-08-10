@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/png" href="/icons/obs-icon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OBS-LAB - Model setup</title>
+<link rel="icon" type="image/png" href="/favicon.ico">
+<style>
+:root{
+  --navy:#3f4d5e; --navy2:#33404e; --navy3:#28323d;
+  --accent:#00009B; --accent2:#0000c4; --accent-soft:#d7d7f2;
+  --bg:#d7d7d7; --panel:#ffffff; --panel2:#e9e9e9;
+  --border:#9a9a9a; --border2:#787878;
+  --text:#0d0d0d; --text2:#3a3a3a; --text3:#6b6b6b;
+  --green:#3f8f3f; --red:#b03a2e;
+  --font:Arial,Helvetica,'Liberation Sans',sans-serif;
+  --data:'Courier New',Courier,'Liberation Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:460px;max-width:100%;background:var(--panel);border:1px solid var(--border2);
+  box-shadow:0 10px 40px rgba(0,0,0,0.32)}
+.card-head{background:var(--navy);padding:18px 22px;border-bottom:2px solid var(--navy3);
+  display:flex;align-items:center;gap:12px}
+.card-head svg{display:block;flex-shrink:0}
+.brand-wrap{display:flex;flex-direction:column;justify-content:center}
+.brand{font-size:14px;font-weight:bold;color:#d6dce2;letter-spacing:0.3px;line-height:1.3}
+.brand-sub{font-size:11px;color:#8aaccb;font-style:italic;margin-top:1px}
+.card-body{padding:24px 22px 20px}
+.welcome{font-size:15px;font-weight:bold;color:var(--text);margin-bottom:2px}
+.welcome-sub{font-size:11px;color:var(--text3);margin-bottom:20px;line-height:1.5}
+.btn{width:100%;padding:11px;border:1px solid var(--navy3);background:var(--accent);color:#fff;
+  font-family:var(--font);font-size:13px;font-weight:bold;cursor:pointer;letter-spacing:0.4px;
+  margin-top:4px;transition:background .12s}
+.btn:hover{background:var(--accent2)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:0.55;cursor:default;transform:none}
+.bar-wrap{margin-top:18px;display:none}
+.bar-wrap.on{display:block}
+.bar-track{width:100%;height:10px;background:var(--panel2);border:1px solid var(--border);overflow:hidden}
+.bar-fill{height:100%;width:30%;background:var(--accent);
+  animation:slide 1.3s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-30%}100%{margin-left:100%}}
+.phase{margin-top:10px;font-size:12px;color:var(--text2);text-align:center;font-family:var(--data)}
+.msg{margin-top:14px;padding:9px 11px;font-size:12px;display:none;line-height:1.4}
+.msg.err{display:block;background:#f6e4e2;border:1px solid var(--red);color:var(--red)}
+.msg.ok{display:block;background:#e3f0e3;border:1px solid var(--green);color:var(--green)}
+.hint{margin-top:16px;font-size:11px;color:var(--text3);text-align:center;line-height:1.5}
+.foot{padding:11px 22px;border-top:1px solid var(--border);background:var(--panel2);
+  display:flex;align-items:center;justify-content:space-between}
+.foot .ver{font-size:10px;color:var(--text3);font-family:var(--data)}
+.foot .dot{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);font-family:var(--data)}
+.foot .dot i{width:7px;height:7px;border-radius:50%;background:#4acd8a;box-shadow:0 0 4px #4acd8a;display:inline-block}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-head">
+    <svg width="58" height="36" viewBox="0 0 160 160">
+      <text x="46" y="98" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="44" font-weight="800" fill="#fff" letter-spacing="-2">OBS</text>
+    </svg>
+    <div class="brand-wrap">
+      <div class="brand">OBS-LAB</div>
+      <div class="brand-sub">Model setup</div>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div class="welcome">Download the language model</div>
+    <div class="welcome-sub">OBS needs its embedding model to search your documents. This is a one time download of about 2.2 GB and requires an internet connection. Once downloaded it stays on this machine and works fully offline. When the download finishes, close and reopen OBS to finish setup.</div>
+    <button class="btn" id="dlBtn" onclick="startDownload()">Download now</button>
+    <div class="bar-wrap" id="barWrap">
+      <div class="bar-track"><div class="bar-fill"></div></div>
+      <div class="phase" id="phase">Starting...</div>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div class="hint">Keep OBS open until the download completes. You can leave this window in the background.</div>
+  </div>
+
+  <div class="foot">
+    <span class="ver">OBS v2.6.0</span>
+    <span class="dot"><i></i>server online</span>
+  </div>
+</div>
+
+<script>
+var polling = null;
+
+function setMsg(text, kind){
+  var m = document.getElementById("msg");
+  m.textContent = text;
+  m.className = "msg " + kind;
+}
+
+function phaseLabel(p){
+  if(p === "configuration") return "Downloading configuration files...";
+  if(p === "weights") return "Downloading model weights, this may take several minutes...";
+  if(p === "conversion") return "Preparing the model...";
+  if(p === "starting") return "Starting...";
+  return "Working...";
+}
+
+function startDownload(){
+  var btn = document.getElementById("dlBtn");
+  btn.disabled = true;
+  document.getElementById("barWrap").className = "bar-wrap on";
+  setMsg("", "");
+  fetch("/api/models/download", {method: "POST"}).then(function(r){
+    return r.json();
+  }).then(function(){
+    poll();
+    polling = setInterval(poll, 2000);
+  }).catch(function(){
+    setMsg("Network error while starting the download.", "err");
+    btn.disabled = false;
+  });
+}
+
+function poll(){
+  fetch("/api/models/status").then(function(r){
+    return r.json();
+  }).then(function(st){
+    if(st.ready || st.status === "done"){
+      if(polling) clearInterval(polling);
+      document.getElementById("barWrap").className = "bar-wrap";
+      setMsg("Model ready. Please close and reopen OBS to finish setup.", "ok");
+      document.getElementById("dlBtn").style.display = "none";
+      return;
+    }
+    if(st.status === "error"){
+      if(polling) clearInterval(polling);
+      document.getElementById("barWrap").className = "bar-wrap";
+      setMsg("Download failed: " + (st.error || "unknown error"), "err");
+      document.getElementById("dlBtn").disabled = false;
+      return;
+    }
+    document.getElementById("phase").textContent = phaseLabel(st.phase);
+  }).catch(function(){});
+}
+
+fetch("/api/models/status").then(function(r){ return r.json(); }).then(function(st){
+  if(st.status === "running"){
+    document.getElementById("dlBtn").disabled = true;
+    document.getElementById("barWrap").className = "bar-wrap on";
+    poll();
+    polling = setInterval(poll, 2000);
+  }
+}).catch(function(){});
+</script>
+</body>
+</html>

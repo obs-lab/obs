@@ -1,0 +1,95 @@
+# api
+.env
+.env.*
+*.key
+backend/.env
+
+# secrets, credentials and license tooling
+# these must never enter a public repository
+config.json
+backend/config.json
+*.pem
+*.p12
+*.pfx
+obs_private_key.txt
+obs_public_key.txt
+regen_password*
+smtp_*
+credentials.json
+secrets.json
+
+# license generator toolkit (lives outside the shipped project)
+obs_license_core.py
+obs_keygen.py
+obs_licensegen.py
+obs_licensegen_web.py
+test_license.py
+licenze_registro.json
+licenze_emesse/
+licenses_issued/
+*.obslic
+OBSLIC1*
+
+# local and private data
+data/
+backend/data/
+*.faiss
+*.index
+chat_history*
+chats/
+*.db
+*.sqlite
+*.sqlite3
+session_signing.key
+
+# python environment
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# rust/tauri build
+target/
+src-tauri/target/
+**/*.rs.bk
+
+# node
+# the leading slash confines the rule to the project root: without it, dist and
+# build would exclude any folder with that name anywhere in the tree
+node_modules/
+/dist/
+/build/
+
+# code editor
+# data/ already covers data/code.db and data/code_files/
+# do NOT ignore docker/ or examples/: they are needed to rebuild the project
+rendimenti.png
+beta.png
+grafico.png
+titolo.csv
+indice.csv
+octave-workspace
+.matplotlib/
+*.oct
+
+# system files
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+
+# editor/ide
+.vscode/
+.idea/
+*.swp
+*~
+OBS_HANDOFF.md
+
+# local embedding model
+backend/models/
+backend/build/
+backend/dist/
