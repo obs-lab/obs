@@ -62,6 +62,21 @@ else
   git commit -m "$SUBJECT" -m "$NOTE"
 fi
 
-git push
-git push obs main
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+if git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+  git push
+elif git remote | grep -qx "origin"; then
+  echo "--- Nessun upstream per '${BRANCH}', lo imposto su origin ---"
+  git push --set-upstream origin "$BRANCH"
+else
+  echo "ATTENZIONE: nessun remote 'origin' configurato, push su origin saltato."
+fi
+
+if git remote | grep -qx "obs"; then
+  git push obs "$BRANCH"
+else
+  echo "ATTENZIONE: nessun remote 'obs' configurato, push su obs saltato."
+fi
+
 echo "--- Commit terminato. ---"
