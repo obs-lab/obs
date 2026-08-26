@@ -10,7 +10,8 @@ var OBS_MDI = {
 
 var OBS_MDI_PANELS = [
   "query", "upload", "documents", "audit", "clusters",
-  "images", "entities", "investigate", "digitize", "code", "sheets"
+  "images", "entities", "investigate", "digitize", "code", "sheets",
+  "agents", "fs"
 ];
 
 function obsMdiT(key, fallback) {
@@ -25,7 +26,7 @@ var OBS_MDI_FB = {
   query: "Query", upload: "Upload", documents: "Documents", audit: "Audit",
   clusters: "Clusters", images: "Images", entities: "Entities",
   investigate: "Investigate", digitize: "Digitize", code: "Code",
-  sheets: "Sheets"
+  sheets: "Sheets", agents: "Agents", fs: "Local files"
 };
 
 function obsMdiLabel(panel) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-FIX_NUMBER="${1:-1}"
+NOTE="$*"
 
 PRIVATE_PATTERN='(^|/)\.env($|\.)|(^|/)data/|\.db$|\.sqlite[23]?$|(^|/)images/|auth\.db|access_log|chat_history|\.faiss$|\.index$|session_signing\.key|(^|/)\.key$'
 
@@ -39,7 +39,29 @@ if git diff --cached --quiet; then
   exit 0
 fi
 
-git commit -m "obs $(date +%d/%m/%Y) fix #${FIX_NUMBER}"
+if [ -z "$NOTE" ] && [ -t 0 ]; then
+  printf "Cosa hai aggiornato (invio per saltare): "
+  read -r NOTE
+fi
+
+NOTE="$(printf '%s' "$NOTE" | tr '\n\r\t' '   ' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+
+SUBJECT="update $(date +%d/%m/%Y)"
+ONE_LINE="${SUBJECT} - ${NOTE}"
+
+echo "--- Messaggio del commit: ---"
+if [ -z "$NOTE" ]; then
+  echo "$SUBJECT"
+  git commit -m "$SUBJECT"
+elif [ "${#ONE_LINE}" -le 72 ]; then
+  echo "$ONE_LINE"
+  git commit -m "$ONE_LINE"
+else
+  echo "$SUBJECT"
+  echo "$NOTE"
+  git commit -m "$SUBJECT" -m "$NOTE"
+fi
+
 git push
 git push obs main
 echo "--- Commit terminato. ---"

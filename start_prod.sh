@@ -63,10 +63,31 @@ fi
 OBS_HOST="${OBS_HOST:-0.0.0.0}"
 OBS_PORT="${OBS_PORT:-8000}"
 OBS_TIMEOUT="${OBS_TIMEOUT:-1800}"
+OBS_SSL_CERT="${OBS_SSL_CERT:-}"
+OBS_SSL_KEY="${OBS_SSL_KEY:-}"
+
+OBS_SCHEME=http
+SSL_ARGS=()
+if [ -n "$OBS_SSL_CERT" ] && [ -n "$OBS_SSL_KEY" ]; then
+  if [ -f "$OBS_SSL_CERT" ] && [ -f "$OBS_SSL_KEY" ]; then
+    SSL_ARGS=(--ssl-certfile "$OBS_SSL_CERT" --ssl-keyfile "$OBS_SSL_KEY")
+    OBS_SCHEME=https
+  else
+    echo "WARNING: OBS_SSL_CERT or OBS_SSL_KEY point to a missing file. Falling back to http."
+    echo "   Microphone capture will not work outside localhost."
+    echo ""
+  fi
+elif [ "$OBS_HOST" != "127.0.0.1" ] && [ "$OBS_HOST" != "localhost" ]; then
+  echo "NOTE: serving over plain http on a network address."
+  echo "   Browsers only grant microphone access on localhost or over https."
+  echo "   To enable voice for remote users set OBS_SSL_CERT and OBS_SSL_KEY."
+  echo ""
+fi
+
 
 export OBS_ENV=production
 
-echo "Starting OBS-LAB in production on http://$OBS_HOST:$OBS_PORT"
+echo "Starting OBS-LAB in production on $OBS_SCHEME://$OBS_HOST:$OBS_PORT"
 echo "   single worker, keep-alive ${OBS_TIMEOUT}s"
 echo "   (Ctrl+C to stop)"
 echo ""
@@ -78,4 +99,5 @@ uvicorn main:app \
   --workers 1 \
   --timeout-keep-alive "$OBS_TIMEOUT" \
   --limit-concurrency 64 \
-  --no-access-log
+  --no-access-log \
+  "${SSL_ARGS[@]}"

@@ -49,6 +49,13 @@ import sheets_store
 import sheets_routes
 import model_setup
 from auth_routes import current_user, require_roles
+import llm_bridge
+import agents
+import agents_store
+import agents_routes
+import fs_access
+import fs_routes
+import voice_routes
 
 try:
     from dotenv import load_dotenv
@@ -636,6 +643,40 @@ def _norm_lang(lang) -> str:
     return "en"
 
 
+_LANG_HINTS = {
+    "it": ("il","lo","la","i","gli","le","un","uno","una","di","del","dello",
+           "della","dei","degli","delle","al","allo","alla","ai","agli","alle",
+           "da","dal","dalla","dai","nel","nella","nei","negli","nelle","con",
+           "su","sul","sulla","per","tra","fra","ed","che","chi","cui","non",
+           "come","dove","quando","perche","quale","quali","quanto","cosa",
+           "sono","ha","hanno","era","erano","essere","questo","questa",
+           "questi","queste","anche","piu","molto","tutti","tutte","ma","si",
+           "ci","mi","ne","viene","vengono","stato","stata","fare","puo"),
+    "en": ("the","of","to","on","at","for","with","by","from","and","or","but",
+           "is","are","was","were","be","been","being","has","have","had",
+           "does","did","this","that","these","those","it","its","which","who",
+           "what","when","where","why","how","not","all","any","some","more",
+           "most","can","could","should","would","will","there","their","they",
+           "we","you","about","into","than","then","also","such","only"),
+}
+
+
+def _detect_lang(text, hint="en") -> str:
+    import re
+    words = re.findall(r"[a-zàèéìòùáíóúâêôãõäöüçñ]+", (text or "").lower())
+    if len(words) < 2:
+        return _norm_lang(hint)
+    scores = {}
+    for code, markers in _LANG_HINTS.items():
+        scores[code] = sum(1 for w in words if w in markers) / float(len(words))
+    ordered = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    best, top = ordered[0]
+    second = ordered[1][1] if len(ordered) > 1 else 0.0
+    if top >= 0.06 and (second == 0.0 or top >= second * 1.25):
+        return best
+    return _norm_lang(hint)
+
+
 _QA_SYSTEM_PROMPT = {
     "en": (
         "You are OBS-LAB, a document knowledge-management system. "
@@ -660,25 +701,46 @@ _QA_SYSTEM_PROMPT = {
 }
 
 
+_QA_LABELS = {
+    "en": {
+        "source":      "Source",
+        "context":     "DOCUMENT CONTEXT",
+        "question":    "QUESTION",
+        "intent":      "QUERY TYPE",
+        "instruction": "Write your answer in English, precisely, and grounded only in "
+                       "the context above.",
+    },
+    "it": {
+        "source":      "Fonte",
+        "context":     "CONTESTO DOCUMENTALE",
+        "question":    "DOMANDA",
+        "intent":      "TIPO DI QUERY",
+        "instruction": "Scrivi la risposta in italiano, con precisione, basandoti "
+                       "unicamente sul contesto qui sopra.",
+    },
+}
+
+
 def _build_prompt(query, chunks, intent, lang="en"):
     """Costruisce system prompt e user message condivisi da tutti i backend."""
+    code = _norm_lang(lang)
+    labels = _QA_LABELS[code]
+
     context_parts = []
     for i, c in enumerate(chunks[:OBS_CONFIG["top_k_reranked"]], 1):
         context_parts.append(
-            f"[Fonte {i}: {c['azienda']} - {c['titolo']} ({c['tipo']})]\n{c['text']}"
+            f"[{labels['source']} {i}: {c['azienda']} - {c['titolo']} ({c['tipo']})]\n{c['text']}"
         )
     context = "\n\n---\n\n".join(context_parts)
 
-    system_prompt = _QA_SYSTEM_PROMPT[_norm_lang(lang)]
+    system_prompt = _QA_SYSTEM_PROMPT[code]
 
-    user_message = f"""CONTESTO DOCUMENTALE:
-{context}
-
-DOMANDA: {query}
-
-TIPO DI QUERY: {intent}
-
-Fornisci una risposta precisa basata sul contesto."""
+    user_message = (
+        f"{labels['context']}:\n{context}\n\n"
+        f"{labels['question']}: {query}\n\n"
+        f"{labels['intent']}: {intent}\n\n"
+        f"{labels['instruction']}"
+    )
     return system_prompt, user_message
 
 
@@ -904,6 +966,9 @@ from fastapi.responses import JSONResponse as _JSONResponse
 app.include_router(auth_routes.router)
 app.include_router(sharing_routes.router)
 app.include_router(code_routes.router)
+app.include_router(agents_routes.router)
+app.include_router(fs_routes.router)
+app.include_router(voice_routes.router)
 if os.environ.get("OBS_SHEETS_ENABLED", "1") != "0":
     app.include_router(sheets_routes.router)
 
@@ -1248,7 +1313,8 @@ def query(req: QueryRequest, user: dict = Depends(current_user)):
     if intent in ("RELATIONAL", "ANALYTICAL"):
         kg_ctx = kg_traversal(req.query)
 
-    gen = generate_answer(req.query, top_chunks, intent, req.conversation_history or [], _norm_lang(req.lang))
+    answer_lang = _detect_lang(req.query, req.lang)
+    gen = generate_answer(req.query, top_chunks, intent, req.conversation_history or [], answer_lang)
 
     latency = int((time.time() - t0) * 1000)
     log_audit(req.query, intent, len(top_chunks), latency, user_id=str(user["user_id"]))
@@ -1870,6 +1936,27 @@ def serve_sheets_frontend():
     f = FRONTEND_DIR / "obs_sheets_frontend.js"
     return FileResponse(str(f), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
+@app.get("/obs_agents_frontend.js")
+def serve_agents_frontend():
+    f = FRONTEND_DIR / "obs_agents_frontend.js"
+    return FileResponse(str(f), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+@app.get("/obs_fs_frontend.js")
+def serve_fs_frontend():
+    f = FRONTEND_DIR / "obs_fs_frontend.js"
+    return FileResponse(str(f), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+@app.get("/obs_voice_frontend.js")
+def serve_voice_frontend():
+    f = FRONTEND_DIR / "obs_voice_frontend.js"
+    return FileResponse(str(f), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+@app.get("/obs_panels.css")
+def serve_panels_css():
+    f = FRONTEND_DIR / "obs_panels.css"
+    return FileResponse(str(f), media_type="text/css",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
 
 ICONS_DIR = FRONTEND_DIR / "icons"
 
@@ -2101,12 +2188,21 @@ def generate_report(query: str, azienda_filter=None, folder_id=None, user=None, 
         ),
     }
     system_prompt = _report_system[_norm_lang(lang)]
-    user_message = (
-        f"FONTI:\n{ctx}\n\nRICHIESTA: {query}\n\n"
-        "Scrivi un report BREVE con 2-4 sezioni '## Titolo'. Ricorda: ogni frase che "
-        "afferma un fatto deve finire con il numero della fonte tra parentesi quadre, "
-        "es. [1] o [3]. Vai dritto al punto, niente preamboli."
-    )
+    _report_user = {
+        "en": (
+            f"SOURCES:\n{ctx}\n\nREQUEST: {query}\n\n"
+            "Write a SHORT report in English with 2 to 4 sections '## Title'. Remember: "
+            "every sentence stating a fact must end with the source number in square "
+            "brackets, for example [1] or [3]. Get straight to the point, no preamble."
+        ),
+        "it": (
+            f"FONTI:\n{ctx}\n\nRICHIESTA: {query}\n\n"
+            "Scrivi un report BREVE in italiano con 2-4 sezioni '## Titolo'. Ricorda: ogni "
+            "frase che afferma un fatto deve finire con il numero della fonte tra parentesi "
+            "quadre, es. [1] o [3]. Vai dritto al punto, niente preamboli."
+        ),
+    }
+    user_message = _report_user[_norm_lang(lang)]
 
     raw = _llm_complete(system_prompt, user_message, max_tokens=REPORT_MAX_TOKENS)
 
@@ -5249,6 +5345,77 @@ def _reclaim_orphan_owners() -> None:
     logger.info("Recuperati oggetti di %d utenti non piu' esistenti.", len(missing))
 
 
+def _tool_query(payload, user):
+    question = str(payload.get("query", "")).strip()
+    if not question:
+        raise ValueError("Parametro 'query' mancante.")
+    chunks = retrieve(question, user=user, folder_id=payload.get("folder_id"),
+                      azienda_filter=payload.get("azienda"))
+    ranked = rerank(question, chunks)[:OBS_CONFIG["top_k_reranked"]]
+    return [
+        {
+            "titolo":  c.get("titolo", ""),
+            "azienda": c.get("azienda", ""),
+            "tipo":    c.get("tipo", ""),
+            "doc_id":  c.get("doc_id", ""),
+            "text":    (c.get("text") or "")[:1200],
+        }
+        for c in ranked
+    ]
+
+
+def _tool_documents(payload, user):
+    docs = list_documents(user=user, folder_id=payload.get("folder_id"))
+    return [
+        {
+            "doc_id":  d.get("doc_id", ""),
+            "titolo":  d.get("titolo", ""),
+            "azienda": d.get("azienda", ""),
+            "tipo":    d.get("tipo", ""),
+            "chunks":  d.get("chunks", 0),
+        }
+        for d in docs[:60]
+    ]
+
+
+def _tool_entities(payload, user):
+    graph = _build_entity_graph(
+        azienda_filter=payload.get("azienda"),
+        doc_ids=payload.get("doc_ids"),
+        user=user,
+        folder_id=payload.get("folder_id"),
+    )
+    return {
+        "nodes": graph.get("nodes", [])[:80],
+        "edges": graph.get("edges", [])[:120],
+    }
+
+
+def _tool_status(payload, user):
+    return status(user=user, folder_id=payload.get("folder_id"))
+
+
+OBS_AGENT_TOOLS = {
+    "obs_query":     _tool_query,
+    "obs_documents": _tool_documents,
+    "obs_entities":  _tool_entities,
+    "obs_status":    _tool_status,
+}
+
+
+def _agent_user_resolver(user_id):
+    record = auth.get_user_by_id(user_id)
+    if not record or not record.get("active"):
+        return None
+    return {
+        "user_id":  record["id"],
+        "email":    record["email"],
+        "username": record["username"],
+        "role":     record["role"],
+        "azienda":  record["azienda"],
+    }
+
+
 @app.on_event("startup")
 def startup():
     logger.info("OBS starting - warming up models")
@@ -5297,6 +5464,21 @@ def startup():
         _reclaim_orphan_owners()
     except Exception as e:
         logger.warning("Recupero oggetti orfani non riuscito: %s", e)
+    try:
+        agents_store.init_db()
+        fs_access.init_db()
+        llm_bridge.register(
+            llm_complete=_llm_complete,
+            llm_label=_llm_mode_label,
+            tools=OBS_AGENT_TOOLS,
+        )
+    except Exception as e:
+        logger.warning("Init agenti o filesystem non riuscito: %s", e)
+    try:
+        if agents.start_scheduler(_agent_user_resolver):
+            logger.info("Scheduler agenti attivo")
+    except Exception as e:
+        logger.warning("Avvio scheduler agenti non riuscito: %s", e)
     logger.info("OBS ready.")
 
 if __name__ == "__main__":

@@ -46,12 +46,23 @@ if "%OBS_HOST%"=="" set OBS_HOST=0.0.0.0
 if "%OBS_PORT%"=="" set OBS_PORT=8000
 if "%OBS_TIMEOUT%"=="" set OBS_TIMEOUT=1800
 set OBS_ENV=production
+set SSL_ARGS=
+set OBS_SCHEME=http
+if not "%OBS_SSL_CERT%"=="" if not "%OBS_SSL_KEY%"=="" (
+  set SSL_ARGS=--ssl-certfile "%OBS_SSL_CERT%" --ssl-keyfile "%OBS_SSL_KEY%"
+  set OBS_SCHEME=https
+)
+if "%OBS_SCHEME%"=="http" (
+  echo NOTE: browsers only grant microphone access on localhost or over https.
+  echo    To enable voice for remote users set OBS_SSL_CERT and OBS_SSL_KEY.
+  echo.
+)
 
-echo Starting OBS-LAB in production on http://%OBS_HOST%:%OBS_PORT%
+echo Starting OBS-LAB in production on %OBS_SCHEME%://%OBS_HOST%:%OBS_PORT%
 echo    single worker, keep-alive %OBS_TIMEOUT%s
 echo    Press Ctrl+C to stop.
 echo.
 
 cd backend
-uvicorn main:app --host %OBS_HOST% --port %OBS_PORT% --workers 1 --timeout-keep-alive %OBS_TIMEOUT% --limit-concurrency 64 --no-access-log
+uvicorn main:app --host %OBS_HOST% --port %OBS_PORT% --workers 1 --timeout-keep-alive %OBS_TIMEOUT% --limit-concurrency 64 --no-access-log %SSL_ARGS%
 pause

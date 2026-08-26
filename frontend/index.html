@@ -920,6 +920,7 @@ header{padding:2px 8px}
 .ucard{max-width:680px;margin:0}
 .uctitle{border-bottom:1px solid #cfcfcf;padding-bottom:6px}
 </style>
+<link rel="stylesheet" href="/obs_panels.css">
 
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
@@ -960,6 +961,8 @@ header{padding:2px 8px}
     <div class="mob-nav-item" onclick="switchPanel('upload');closeMobNav()" id="mobNavUpload">Upload document</div>
     <div class="mob-nav-item" onclick="switchPanel('documents');closeMobNav()" id="mobNavDocs">Documents</div>
     <div class="mob-nav-item" onclick="switchPanel('audit');closeMobNav()" id="mobNavAudit">Audit trail</div>
+    <div class="mob-nav-item" onclick="switchPanel('agents');closeMobNav()">Agents</div>
+    <div class="mob-nav-item" onclick="switchPanel('fs');closeMobNav()">Local files</div>
   </div>
   <div class="mob-nav-section">
     <div class="mob-nav-label" id="mobNavTools">Tools</div>
@@ -988,6 +991,8 @@ header{padding:2px 8px}
       <div class="mdi" onclick="switchPanel('upload')" id="menuViewUpload"></div>
       <div class="mdi" onclick="switchPanel('documents')" id="menuViewDocs"></div>
       <div class="mdi" onclick="switchPanel('audit')" id="menuViewAudit"></div>
+      <div class="mdi" onclick="switchPanel('agents')">Agents</div>
+      <div class="mdi" onclick="switchPanel('fs')">Local files</div>
     </div>
   </div>
   <div class="mitem" onclick="toggleMenu(this)"><span id="menuTools"></span>
@@ -1024,6 +1029,8 @@ header{padding:2px 8px}
   <button class="ntab" id="tab-digitize" onclick="switchPanel('digitize')">Digitize</button>
   <button class="ntab" id="tab-code" onclick="switchPanel('code')">Code</button>
   <button class="ntab" id="tab-sheets" onclick="switchPanel('sheets')">Sheets</button>
+  <button class="ntab" id="tab-agents" onclick="switchPanel('agents')">Agents</button>
+  <button class="ntab" id="tab-fs" onclick="switchPanel('fs')">Local files</button>
   <button class="ntab obs-bm-add" id="obsBmAdd" onclick="obsMdiNewFromCurrent()" title="New window">+</button>
   <div class="tright">
     <button class="ntab" id="connectBtn" onclick="forceConnect()" style="padding:3px 10px;font-size:11px">Connect</button>
@@ -1113,6 +1120,13 @@ header{padding:2px 8px}
           <option value="qqplot">Q-Q plot (normality)</option>
           <option value="cdf">Cumulative distribution (CDF)</option>
         </select>
+        <button class="btn btng voice-btn" id="voiceMicBtn" style="display:none"
+                onclick="obsVoiceToggleRecord()" title="Dictate the question">&#9679;</button>
+        <button class="btn btng voice-btn" id="voiceSpeakBtn" style="display:none"
+                onclick="obsVoiceSpeakLast()" title="Read the last answer aloud">&#9658;</button>
+        <button class="btn btng voice-btn" id="voiceConvBtn" style="display:none"
+                onclick="obsVoiceConvToggle()" title="Hands free conversation">&#9678;</button>
+        <span id="voiceConvState"></span>
       </div>
       <div class="qrow">
         <textarea id="queryInput" placeholder="Ask a question" rows="1"
@@ -1569,6 +1583,78 @@ header{padding:2px 8px}
     </div>
 
     <div id="codeToast" style="display:none;position:fixed;bottom:24px;right:24px;padding:9px 16px;background:var(--panel2);border:1px solid var(--border3);font-size:12px;z-index:400"></div>
+  </div>
+
+  <div class="panel" id="panelAgents">
+    <div class="phdr">
+      <span class="ptitle">Agents</span>
+      <span class="ag-item-meta" id="agentStatus"></span>
+    </div>
+    <div class="ag-body">
+      <div class="ag-side">
+        <div class="ag-side-head">Your agents</div>
+        <div class="ag-side-tools">
+          <button class="btn btng" onclick="obsAgentsNew('script')">New script</button>
+          <button class="btn btng" onclick="obsAgentsNew('assisted')">New assisted</button>
+          <button class="btn btng" onclick="obsAgentsNew('external')">New external</button>
+        </div>
+        <div class="ag-list" id="agentList"></div>
+      </div>
+      <div class="ag-main" id="agentMain">
+        <div class="ag-empty">Select an agent on the left, or create a new one.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panelFs">
+    <div class="phdr">
+      <span class="ptitle">Local files</span>
+      <span class="ag-item-meta" id="fsStatus"></span>
+    </div>
+    <div class="fs-body">
+      <div class="fs-side">
+        <div class="ag-side-head">Allowed folders</div>
+        <div class="ag-list" id="fsRoots"></div>
+        <div class="ag-side-tools" style="flex-direction:column;align-items:stretch">
+          <input type="text" id="fsNewRoot" class="modal-input"
+                 style="margin:0;font-size:11px;font-weight:normal;text-transform:none;letter-spacing:normal;text-align:left;padding:4px 7px"
+                 placeholder="Full path of a folder">
+          <input type="text" id="fsNewLabel" class="modal-input"
+                 style="margin:0;font-size:11px;font-weight:normal;text-transform:none;letter-spacing:normal;text-align:left;padding:4px 7px"
+                 placeholder="Label (optional)">
+          <button class="btn btng" onclick="obsFsAddRoot()">Add folder</button>
+        </div>
+      </div>
+      <div class="fs-main">
+        <div class="fs-bar">
+          <button class="btn btng" onclick="obsFsUp()">Up</button>
+          <span class="fs-path" id="fsPath">Registered folders</span>
+          <input type="text" id="fsPattern" class="modal-input"
+                 style="margin:0;width:130px;font-size:11px;font-weight:normal;text-transform:none;letter-spacing:normal;text-align:left;padding:4px 7px"
+                 placeholder="*.pdf">
+          <input type="text" id="fsContains" class="modal-input"
+                 style="margin:0;width:150px;font-size:11px;font-weight:normal;text-transform:none;letter-spacing:normal;text-align:left;padding:4px 7px"
+                 placeholder="contains text">
+          <button class="btn btng" onclick="obsFsSearch()">Search</button>
+        </div>
+        <div class="fs-split">
+          <div class="fs-tree" id="fsTree"></div>
+          <div class="fs-view">
+            <div class="fs-view-head">
+              <span class="nm" id="fsFileName">No file open</span>
+              <button class="fs-x" onclick="obsFsClearView()" title="Close">&times;</button>
+            </div>
+            <div class="fs-ask">
+              <input type="text" id="fsQuestion" placeholder="What should OBS look for in this file?">
+              <button class="btn btng" onclick="obsFsAnalyze()">Analyse</button>
+            </div>
+            <div class="fs-view-body" id="fsViewBody">
+              <div class="ag-empty">Pick a file on the left. It is read from disk, never copied into the archive and never indexed.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="panel" id="panelSheets">
@@ -2188,6 +2274,8 @@ function _obsSwitchPanelCore(name) {
   if (name === 'digitize') initDigitizePanel();
   if (name === 'code') initCodePanel();
   if (name === 'sheets') initSheetsPanel();
+  if (name === 'agents') initAgentsPanel();
+  if (name === 'fs') initFsPanel();
   if (name === 'query') {
     
     setTimeout(rerenderCharts, 120);
@@ -6640,5 +6728,8 @@ setInterval(function() {
 <script src="obs_code_frontend.js"></script>
 <script src="obs_sheets_frontend.js"></script>
 <script src="obs_mdi_frontend.js"></script>
+<script src="obs_agents_frontend.js"></script>
+<script src="obs_fs_frontend.js"></script>
+<script src="obs_voice_frontend.js"></script>
 </body>
 </html>
