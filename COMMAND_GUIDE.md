@@ -1298,6 +1298,578 @@ and in `OBS_MDI_FB`.
 The file must sit in `frontend/`, next to the other `obs_*_frontend.js`, and
 `main.py` must declare its route. Copying the file alone is not enough.
 
+## 22. Agents (from v2.6.0)
+
+OBS lets each user register agents that run against the archive. There are three
+kinds and they are deliberately different from each other.
+
+| Kind | What it is | Needs a language model | Network |
+|------|-----------|------------------------|---------|
+| Script | Your own code, run in a disposable container | No | Container to OBS only |
+| Assisted | A step loop where the model calls declared tools | Yes | None |
+| External | An HTTP call to an agent you built elsewhere | No | Only to allowed hosts |
+
+### Where to find it
+
+Toolbar tab **Agents**, or menu **View > Agents**.
+
+### Script agents
+
+The same sandbox as the Code panel: disposable container, memory and CPU caps,
+no access to the host. If you tick "Give the sandbox an OBS access token", the
+container receives `OBS_TOKEN` and `OBS_URL` and the OBS client library for the
+chosen language is injected, exactly as in the Code panel. The token lives for
+120 seconds, carries only your own permissions and is revoked when the run ends.
+
+### Assisted agents
+
+At each step the language model answers with a single JSON object: either a tool
+call or a final answer. The tools are the ones registered on the backend, listed
+in the panel. If a step names a tool you did not tick, the call is refused and
+the refusal appears in the trace.
+
+Two limits worth knowing before you rely on it. First, the loop is capped: when
+the step budget runs out the run is recorded as failed and no answer is
+produced. Second, small local models frequently break the JSON format, which
+burns steps without progress. Read the trace of a failed run before blaming the
+objective.
+
+### External agents
+
+OBS sends `POST` with a JSON body containing the agent name, your input and your
+organisation, and displays whatever comes back. If the reply is JSON with an
+`answer`, `output`, `result`, `text` or `content` field, that field is shown;
+otherwise the raw body is shown.
+
+Addresses on loopback (`127.0.0.1`, `localhost`, `host.docker.internal`) and on
+private networks work with no configuration. Public hosts are refused unless you
+opt in:
+
+```bash
+OBS_AGENTS_EXTERNAL=1
+OBS_AGENTS_EXTERNAL_HOSTS=agents.example.com,tools.example.org
+```
+
+### Periodic triggers
+
+Off by default. To enable:
+
+```bash
+OBS_AGENTS_SCHEDULER=1
+OBS_AGENTS_SCHEDULER_TICK=30
+```
+
+Once enabled, an agent can be set to run every N seconds, with N no smaller than
+`OBS_AGENT_MIN_INTERVAL` (60 by default). Periodic runs appear in the history
+with trigger `interval`.
+
+### Environment variables
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OBS_AGENT_TIMEOUT` | `180` | wall clock cap for one run, in seconds |
+| `OBS_AGENT_MAX_STEPS` | `8` | default step budget for assisted agents |
+| `OBS_AGENT_CONCURRENCY` | `2` | simultaneous runs allowed |
+| `OBS_AGENT_MIN_INTERVAL` | `60` | smallest periodic interval |
+| `OBS_AGENT_RUN_KEEP` | `500` | runs kept in history |
+| `OBS_AGENTS_EXTERNAL` | `0` | allow non-local targets |
+| `OBS_AGENTS_EXTERNAL_HOSTS` | empty | comma separated allow list |
+| `OBS_AGENTS_EXTERNAL_TIMEOUT` | `60` | cap on the declarable timeout |
+| `OBS_AGENTS_SCHEDULER` | `0` | enable periodic triggers |
+| `OBS_AGENTS_SCHEDULER_TICK` | `30` | scheduler poll interval |
+
+### Quick endpoint tests
+
+```bash
+# what the backend offers
+curl -b cookies.txt http://localhost:8000/api/agents/status
+
+# list your agents
+curl -b cookies.txt http://localhost:8000/api/agents
+
+# check whether a target address is allowed
+curl -b cookies.txt -X POST http://localhost:8000/api/agents/probe \
+  -H "Content-Type: application/json" \
+  -d '{"url":"http://127.0.0.1:5001/run"}'
+
+# run an agent
+curl -b cookies.txt -X POST http://localhost:8000/api/agents/AGENT_ID/run \
+  -H "Content-Type: application/json" \
+  -d '{"input":"suppliers mentioned in 2024"}'
+```
+
+### Troubleshooting
+
+**"Nessun motore linguistico attivo"** on an assisted agent. There is no cloud or
+local model configured. Check `/api/llm/status` and section 7 of this guide.
+
+**"Gli agenti verso host esterni sono disattivati"**. The target resolves to a
+public address and `OBS_AGENTS_EXTERNAL` is not `1`. Either point the agent at a
+local address or add the host to the allow list.
+
+**"Lo scheduler e' disattivato"** when saving a periodic agent. Set
+`OBS_AGENTS_SCHEDULER=1` and restart the backend.
+
+**"Troppe esecuzioni contemporanee"**. More runs than `OBS_AGENT_CONCURRENCY`
+were requested at once. Wait, or raise the value on a machine that can take it.
+
+**A script agent fails immediately with a Docker error.** The language image is
+missing. Pull it from the Code panel, see section 20 of this guide.
+
+---
+
+## 23. Local files panel (from v2.6.0)
+
+This panel reads files that are already on the machine. It does not upload them,
+does not copy them, does not index them and never writes to disk.
+
+### Where to find it
+
+Toolbar tab **Local files**, or menu **View > Local files**.
+
+### How it works
+
+Nothing is readable until you register a folder as a root. Registering a root is
+what grants access; removing it takes the access away immediately, and because
+nothing was indexed, nothing is left behind.
+
+Every path you open is resolved to its canonical form first, so symbolic links
+and relative components cannot be used to step outside a root.
+
+### What is always refused
+
+Regardless of which roots you register:
+
+- system directories (`/etc`, `/proc`, `/sys`, `/boot`, `C:\Windows`, and similar)
+- the OBS data directory, and any folder that contains it
+- credential folders: `.ssh`, `.gnupg`, `.aws`, `.azure`, `.kube`
+- `.env` files and key material (`*.pem`, `*.key`, `*.pfx`, `*.p12`)
+- the OBS databases themselves
+- noise folders: `.git`, `node_modules`, `__pycache__`, `venv`
+
+### Reading and analysing
+
+Text formats are read directly. PDF, DOCX, XLSX and XLS are text-extracted with
+the same libraries the archive ingestion uses. Everything else is listed but not
+opened.
+
+The **Analyse** button sends the extracted text and your question to whichever
+language model is configured. With no model configured the file is still read and
+shown, and the panel says so instead of pretending.
+
+### Single machine versus server
+
+By default each user manages their own roots. On a server this matters: the disk
+being read is the server disk, not the user's laptop. Server mode is off by
+default. To turn it on:
+
+```bash
+OBS_FS_SERVER_MODE=1
+```
+
+With server mode on, an admin can assign roots to users of their own
+organisation and a developer to anyone. To switch the panel off entirely, which
+is the recommended setting for `start_prod.sh` and `start_prod.bat` unless you
+decided otherwise:
+
+```bash
+OBS_FS_ENABLED=0
+```
+
+### Environment variables
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OBS_FS_ENABLED` | `1` | enable the panel |
+| `OBS_FS_SERVER_MODE` | `0` | allow admins and developers to assign roots |
+| `OBS_FS_MAX_READ_BYTES` | `4194304` | largest readable file |
+| `OBS_FS_MAX_TEXT_CHARS` | `200000` | characters extracted per file |
+| `OBS_FS_MAX_ENTRIES` | `2000` | entries returned per folder |
+| `OBS_FS_MAX_SCAN` | `20000` | files examined by one search |
+| `OBS_FS_MAX_DEPTH` | `12` | deepest level a search descends |
+| `OBS_FS_SCAN_TIMEOUT` | `20` | seconds before a search stops |
+
+### Quick endpoint tests
+
+```bash
+curl -b cookies.txt http://localhost:8000/api/fs/status
+
+curl -b cookies.txt -X POST http://localhost:8000/api/fs/roots \
+  -H "Content-Type: application/json" \
+  -d '{"path":"/Users/me/Documents/cases","label":"Cases"}'
+
+curl -b cookies.txt "http://localhost:8000/api/fs/browse?path=/Users/me/Documents/cases"
+
+curl -b cookies.txt -X POST http://localhost:8000/api/fs/search \
+  -H "Content-Type: application/json" \
+  -d '{"path":"/Users/me/Documents/cases","pattern":"*.pdf","contains":"clause"}'
+```
+
+### Troubleshooting
+
+**"Percorso fuori dalle radici consentite"**. The path is not inside any root you
+registered, or a symbolic link pointed outside one. Register the folder that
+actually contains the file.
+
+**"La radice non puo' contenere o essere dentro i dati di OBS"**. You tried to
+register a folder that overlaps the OBS data directory. Pick a narrower folder.
+
+**"File troppo grande"**. Above `OBS_FS_MAX_READ_BYTES`. Raise the variable only
+if the machine can hold the file in memory.
+
+**A search returns few results and reports that it stopped.** It hit
+`OBS_FS_MAX_SCAN` or `OBS_FS_SCAN_TIMEOUT`. Narrow the starting folder rather
+than raising the limits.
+
+---
+
+## 24. Voice: dictation and read aloud (from v2.6.0)
+
+Both directions run locally. Nothing is sent anywhere. The browser speech API is
+deliberately not used, because on some browsers it ships the audio to a remote
+service.
+
+### Where to find it
+
+Three small buttons in the query bar, next to the filters: microphone, read
+aloud, and hands free conversation. They stay visible even when they cannot
+work, greyed out, and clicking one tells you exactly what is missing.
+
+### Installing an engine
+
+Transcription, pick one:
+
+```bash
+pip install faster-whisper==1.0.3
+# or
+pip install openai-whisper
+```
+
+The model downloads on first use into `data/models/whisper`. Size is set by
+`OBS_STT_MODEL` (`tiny`, `base`, `small`, `medium`, `large-v3`). `small` is the
+default and a reasonable balance on CPU.
+
+Speech, in order of preference:
+
+1. **piper**, best quality and the right choice for a public project.
+2. **say**, already present on macOS, nothing to install.
+3. **espeak-ng**, `sudo apt install espeak-ng` on Linux. Robotic.
+4. **pyttsx3**, `pip install pyttsx3`, as a fallback.
+
+For piper, `get_voices.sh` in the project root installs good neural voices for
+Italian and English:
+
+```bash
+source venv/bin/activate
+pip install piper-tts
+./get_voices.sh
+```
+
+The voices land in `backend/models/piper`. OBS reads the language and the
+quality from the file name, so keep the original names such as
+`it_IT-paola-medium.onnx`. When more than one voice exists for a language, the
+highest quality one wins, in the order high, medium, low, x_low.
+
+### Which language is spoken
+
+The voice follows the language of the answer, not a fixed setting. The text is
+classified by function word frequency across Italian, English, French, Spanish,
+German and Portuguese, and the matching voice is used if installed. If the text
+is too short or ambiguous, the interface language is used, then
+`OBS_TTS_DEFAULT_LANG`.
+
+### Hands free conversation
+
+The third button starts a loop: OBS calibrates the background noise for about
+seven hundred milliseconds, listens, records when it detects speech, closes the
+utterance after 1.2 seconds of silence, transcribes, sends the question to the
+Query panel as if you had typed it, reads the answer aloud, and listens again.
+
+The microphone is suspended while OBS speaks, otherwise the synthesis re enters
+the microphone and the system interrogates itself in a loop. The trade off is
+that you cannot interrupt mid answer by speaking, you have to press the button.
+
+To stop: press the button, press Escape, or say "stop conversation" or
+"chiudi conversazione".
+
+Reading aloud can always be interrupted: the read button turns into a stop
+button while speaking, and Escape works too.
+
+### Checking what is active
+
+```bash
+curl -b cookies.txt http://localhost:8000/api/voice/status
+```
+
+The reply names the engine actually in use for each direction, or an empty string
+if none is available.
+
+### Environment variables
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OBS_VOICE_ENABLED` | `1` | enable both directions |
+| `OBS_STT_MODEL` | `small` | Whisper model size |
+| `OBS_STT_MAX_BYTES` | `26214400` | largest audio accepted |
+| `OBS_TTS_MAX_CHARS` | `4000` | characters synthesised per request |
+| `OBS_TTS_VOICE` | empty | path to a piper `.onnx` voice |
+| `OBS_TTS_VOICE_IT` | empty | force a specific Italian voice |
+| `OBS_TTS_VOICE_EN` | empty | force a specific English voice |
+| `OBS_TTS_DEFAULT_LANG` | `en` | language used when detection is uncertain |
+| `OBS_PIPER_BIN` | empty | path to the piper binary |
+
+### Troubleshooting
+
+**The microphone button does not appear.** No transcription engine is installed,
+or `OBS_VOICE_ENABLED=0`. Check `/api/voice/status`.
+
+**The microphone button is greyed out.** Click it anyway: it tells you why. The
+three possible reasons are a missing transcription engine, a page that is not a
+secure context, and a browser permission.
+
+**"Microphone capture needs a secure context".** This is the most common one and
+it is not a bug. Browsers only grant the microphone on `localhost`, `127.0.0.1`
+or over HTTPS. Opening OBS on `http://0.0.0.0:8000` or on a LAN address such as
+`http://192.168.1.20:8000` gives no microphone at all, because
+`navigator.mediaDevices` does not even exist there. On your own machine, use
+`http://localhost:8000`. To serve voice to other machines, see section 26.
+
+**"Microphone access denied".** The browser blocked the request. Check the site
+permissions. On macOS, a permission denied once is cached by the system and can
+be cleared with `tccutil reset Microphone`.
+
+**Transcription fails after a successful recording.** If you installed
+`openai-whisper` rather than `faster-whisper`, the `ffmpeg` binary must be on the
+PATH. `faster-whisper` decodes on its own and is the recommended choice.
+`/api/voice/status` reports whether ffmpeg was found.
+
+**Diagnosing from the browser.** Open the console and run `obsVoiceDiag()`. It
+prints the origin, whether the context is secure, whether `mediaDevices` and
+`MediaRecorder` exist, which audio container was negotiated, and what the backend
+reports for both engines.
+
+**Transcription is slow.** The first call loads the model, which on CPU can take
+tens of seconds. Later calls are much faster. Dropping `OBS_STT_MODEL` to `base`
+roughly halves the time and costs accuracy.
+
+**The text comes out wrong.** Expected on noisy input, strong accents or
+domain-specific vocabulary. The transcription lands in the query box precisely so
+you can correct it before searching, rather than silently searching for something
+you did not say.
+
+**No sound on read aloud.** Either no speech engine is installed, or the browser
+blocked autoplay. Click once anywhere in the window and try again.
+
+
+---
+
+## 25. Backing up and restoring the archive (from v2.6.0)
+
+The code lives on GitHub and is restored with a clone. The archive does not, and
+never should: it lives entirely in `data/`. These two scripts cover it.
+
+### Why a plain copy is not enough
+
+`vector_store/chunks.json` and `vector_store/faiss.index` must agree. The first
+says that chunk number 4172 belongs to document X and is owned by Y, the second
+holds the vector at position 4172. Copy them at different moments while OBS is
+indexing and you get an archive that starts, searches, and returns references to
+chunks that do not exist. That failure is silent, which makes it worse than an
+empty archive.
+
+Both scripts therefore verify rather than assume.
+
+### Making a backup
+
+```bash
+./obs_backup.sh
+```
+
+Backups are written to `../obs-backup` relative to the project root, so next to
+the project and not inside it. Keeping them inside would put gigabytes in reach
+of `git add -A`, would make each backup contain the previous ones, and would lose
+them together with the folder they are supposed to protect.
+
+What it does, in order: refuses to run if anything is listening on the OBS port;
+checks that chunk count and vector count match; copies `data` excluding
+`upload_tmp` and `models`; writes a SHA-256 for every file; generates
+`MANIFESTO.csv` listing document, title, company, folder, owner and chunk count;
+compresses; and rotates, keeping the last seven.
+
+The manifest is the second safety net. If the index were ever unrecoverable but
+the original documents survived, that CSV tells you which company and which owner
+each document belonged to. Without it they are anonymous files.
+
+Options:
+
+```bash
+./obs_backup.sh --dest /Volumes/External/obs-backup
+./obs_backup.sh --keep 30
+./obs_backup.sh --no-compress
+./obs_backup.sh --force
+```
+
+`--force` proceeds even when the source is inconsistent or OBS is running. Use it
+only when you knowingly want a copy of a damaged archive.
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OBS_BACKUP_DIR` | `../obs-backup` | where backups are written |
+| `OBS_BACKUP_KEEP` | `7` | how many backups to keep |
+
+### Restoring
+
+```bash
+./obs_restore.sh ../obs-backup/obs_data_20260827_150752.tar.gz --dry-run
+```
+
+Always run `--dry-run` first. It extracts to a temporary folder, runs the three
+checks and reports what the backup contains, writing nothing.
+
+The three checks are: every SHA-256 matches; no file has metadata but no content
+(the sparse file failure described in section 19); and chunk count equals vector
+count. If any fails, the restore stops and nothing is written.
+
+Without `--dry-run` it asks you to type `RIPRISTINA` in full. The current archive
+is never deleted, it is moved aside with a timestamp.
+
+### What good output looks like
+
+```
+--- Verifica di coerenza prima della copia ---
+  OK chunk=458 vettori=458
+```
+
+If the two numbers differ, do not back up: fix the archive first.
+
+### For real use
+
+A backup on the same disk as the computer protects against mistakes and file
+corruption, not against a disk that dies. Once the archive holds anything real,
+point `--dest` at an external disk or a network volume, and schedule it:
+
+```bash
+crontab -e
+0 2 * * * cd /path/to/obs-lab && ./obs_backup.sh >> /tmp/obs_backup.log 2>&1
+```
+
+On Windows, use Task Scheduler with the same command through Git Bash or WSL.
+
+Test a restore at least once. A backup you have never restored is a hope, not a
+copy.
+
+---
+
+## 26. Serving OBS over HTTPS (from v2.6.0)
+
+Only needed when users reach OBS from another machine. On the machine itself,
+`http://localhost:8000` is enough for everything, voice included.
+
+Browsers grant the microphone only in a secure context: `localhost`, `127.0.0.1`
+or HTTPS. `start.sh` and `start_prod.sh` bind to `0.0.0.0`, so a colleague
+opening `http://192.168.1.20:8000` gets a working OBS with no voice at all.
+
+### Generating a certificate
+
+```bash
+./make_cert.sh
+```
+
+With `mkcert` installed it produces a certificate that browsers trust with no
+warning. Otherwise it falls back to `openssl` and produces a self signed one,
+which each browser must accept once. Either way the certificate covers
+`localhost`, `127.0.0.1`, the host name and the detected LAN address.
+
+### Starting with TLS
+
+```bash
+export OBS_SSL_CERT=/path/to/certs/obs.crt
+export OBS_SSL_KEY=/path/to/certs/obs.key
+./start_prod.sh
+```
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OBS_SSL_CERT` | empty | path to the certificate |
+| `OBS_SSL_KEY` | empty | path to the private key |
+
+If both are set and the files exist, the server starts on HTTPS. If they are
+missing or point to files that do not exist, it falls back to plain HTTP and
+prints a warning rather than failing to start.
+
+---
+
+## 27. Unblocking a stuck git repository (from v2.6.0)
+
+```bash
+./obs_git_unstick.sh
+```
+
+Repairs `.git/info/exclude`, removes abandoned lock files, and aborts any
+operation left half done: rebase, merge, cherry-pick, revert, am, bisect. It
+does not touch your files and does not remove commits that already exist.
+
+It refuses to remove a lock while a git process is running, rather than pulling
+the rug from under an operation in progress. Add `--unstage` to also empty the
+staging area, which leaves files on disk untouched. Add `--check` to run
+`git fsck`, which is slow and is off by default because on a synchronised folder
+it can take many minutes.
+
+For the repair of `.git/info/exclude` it does not trust file permission tests: it
+asks git itself by running `git status`, and escalates through removing ACLs and
+extended attributes, then recreating the file, checking again after each attempt.
+
+If it still fails, the cause is almost always the one described in section 19.
+
+### Notes on `obs_commit.sh`
+
+The first argument is no longer a fix number, it is the note describing what you
+updated:
+
+```bash
+./obs_commit.sh archive backup and startup fixes
+```
+
+Run it with no argument and it asks, after showing the file list, so you write
+the note with the changes in front of you. Press Enter to skip and the message is
+just `update` with the date. If the resulting subject would exceed 72 characters
+the note goes into the commit body instead of being truncated.
+
+The push now sets its own upstream when the branch has none, and skips a remote
+that is not configured instead of aborting the whole script.
+
+---
+
+## 28. Performance of ingestion and search (from v2.6.0)
+
+Ingestion time is almost entirely embedding computation, so it scales with pages,
+not with the number of files. A single 77 page PDF can cost more than thirty
+short documents.
+
+### Threads
+
+Until v2.6.0, `model_setup.py` set `OMP_NUM_THREADS=1` at module import, before
+PyTorch was loaded. Because `main.py` imports `model_setup` early, that limit
+applied to the whole process: the embedding model ran on one core, always, both
+during ingestion and on every search. This is fixed. The limit now applies only
+if you ask for it:
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OBS_THREADS` | unset | caps OpenMP and MKL threads. Leave unset to let PyTorch decide |
+
+Set it only when OBS must share a machine with other workloads.
+
+### What actually changes the numbers
+
+A server CPU with sixteen or thirty two threads is roughly an order of magnitude
+faster than a dual core laptop. An NVIDIA GPU changes category again. Search is
+already fast everywhere, because it vectorises a single sentence: the bottleneck
+there is the language model writing the answer, not retrieval.
+
+Plan a real archive ingestion for the night, and keep the machine on mains power.
+
+
 ## Licensing, first run and desktop packaging (v2.6.0)
 
 ### License gate
