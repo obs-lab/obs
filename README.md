@@ -47,7 +47,7 @@ Nothing touches the network unless you deliberately choose a cloud language mode
 
 Most document-intelligence tools ask you to ship your archive to a cloud service and trust that it stays private. OBS-LAB inverts that arrangement. The only outbound traffic that can ever leave the machine is a cloud language model, and only when you explicitly turn it on. Search, statistics, clustering, and image analysis never depend on that choice and never reach outside. This makes OBS-LAB a fit for legal, medical, financial, research, and public-sector archives where the data is not allowed to leave the building.
 
-At its foundation OBS-LAB is a thin desktop shell built on **Tauri** that loads a web interface served by a local **FastAPI** backend. Ingestion handles chunking and embeddings. Search runs on a **FAISS** index refined by cross-encoder reranking. Statistics, clustering, entity extraction, and image analysis all execute locally, in process, on your files. The worksheet panel keeps its own data in a separate database that never touches the document archive.
+At its foundation OBS-LAB is a web interface served by a local **FastAPI** backend and opened in your browser. A **Tauri** desktop shell also lives in the repository, but the browser is the supported way to run it. Ingestion handles chunking and embeddings. Search runs on a **FAISS** index refined by cross-encoder reranking. Statistics, clustering, entity extraction, and image analysis all execute locally, in process, on your files. The worksheet panel keeps its own data in a separate database that never touches the document archive.
 
 The design principle running through every module is substitutability: heavy components sit behind narrow interfaces, so the vector store or the graph backend can be swapped without rewriting the pipeline above them. The retrieval quality does not change when the storage underneath does.
 
@@ -56,7 +56,7 @@ The design principle running through every module is substitutability: heavy com
 </div>
 
 ```
-        Desktop shell (Tauri)  ->  loads the local web UI in a window
+        Browser  ->  loads the local web UI
                   |
                   v
         Local backend (FastAPI)
@@ -68,6 +68,9 @@ The design principle running through every module is substitutability: heavy com
         |-- Images       visual + text search, colour, chart digitizing
         |-- Code         sandboxed containers, permission-scoped tokens
         |-- Worksheets   separate database, isolated from the archive
+        |-- Agents       user-defined, bounded, permission-inherited
+        |-- Voice        local transcription and speech, no remote fallback
+        |-- Local files  read in place, never uploaded, never indexed
                   |
                   v
         Language model (your choice):  cloud API  |  local  |  none
@@ -111,6 +114,18 @@ Search images by visual content and by the text inside them, sample and compare 
 <div align="center">
 <img src="docs/img/analysis.png" alt="analysis" width="820"/>
 </div>
+
+### Agents
+
+Register your own agents and let them work on the archive: a script in the sandbox, a step loop where the model calls only the tools you declared, or a call to an agent you built elsewhere. Every run has a step budget and a time ceiling, keeps a full trace, and inherits the permissions of the person who owns it. Agents pointing outside your network need an explicit allow list.
+
+### Voice
+
+Dictate a question and hear the answer read back, or leave it hands free and hold a conversation. Transcription and speech both run on your machine, and the voice follows the language of the answer. The browser speech API is deliberately not used, because on some browsers it sends the audio to a remote service.
+
+### Files already on the machine
+
+Point OBS-LAB at a folder and it browses, searches, and analyses what is there, reading in place. Nothing is uploaded, nothing is indexed, nothing is written. Removing the folder from the allowed list revokes the access with nothing left behind, and system folders, credentials, and key material are refused whatever you register.
 
 ### Multi-user and access control
 
@@ -182,8 +197,11 @@ On a fresh installation there are no accounts. The backend redirects to `/setup`
 | Worksheets | `sheets_compute.py`, `sheets_plots.py`, `sheets_routes.py`, `sheets_store.py` |
 | Images | `color_analysis.py`, `digitizer_core.py` |
 | Sharing | `sharing.py`, `sharing_routes.py` |
-| Frontend | `index.html`, `login.html`, `setup.html`, `models.html`, `i18n.js`, `obs_*_frontend.js` |
-| Desktop shell | `lib.rs`, `main.rs`, `Cargo.toml`, `tauri_conf.json`, `build.rs` |
+| Agents | `agents.py`, `agents_store.py`, `agents_routes.py`, `llm_bridge.py` |
+| Voice | `voice.py`, `voice_routes.py` |
+| Local files | `fs_access.py`, `fs_routes.py` |
+| Frontend | `index.html`, `login.html`, `setup.html`, `models.html`, `i18n.js`, `obs_*_frontend.js`, `obs_panels.css` |
+| Desktop shell | `lib.rs`, `main.rs`, `Cargo.toml`, `tauri.conf.json`, `build.rs` |
 | Sandbox images | `python.Dockerfile`, `r.Dockerfile`, `octave.Dockerfile` |
 
 ---
@@ -212,7 +230,7 @@ On a fresh installation there are no accounts. The backend redirects to `/setup`
 
 <a href="#privacy">#</a>
 
-The design principle is simple and it holds everywhere in the system: your archive never leaves your infrastructure. Models run on your hardware, data is stored locally, and the only outbound traffic possible is a cloud language model that you must explicitly enable.
+The design principle is simple and it holds everywhere in the system: your archive never leaves your infrastructure. Models run on your hardware, data is stored locally, and the only outbound traffic possible is a cloud language model that you must explicitly enable. Speech runs locally in both directions, files read from the machine are never uploaded or indexed, and an agent that points outside your network is refused unless an administrator allows that host.
 
 ---
 
