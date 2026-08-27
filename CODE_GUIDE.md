@@ -44,6 +44,11 @@ If this is the first time, jump to section 2, then section 3.
 
 ## 2. Installing Docker from scratch
 
+This section covers the full installation. If you only need to check that Docker
+is already working, pull the language images, or fix the `docker` group on a
+Linux server, section 20 of `COMMAND_GUIDE.md` is shorter and covers exactly
+that.
+
 Docker is only needed for the languages that run on the server (Python,
 JavaScript, Java, C, C++, Octave, R). HTML and CSS work without it.
 
@@ -270,6 +275,10 @@ In JavaScript the functions are the same but asynchronous, so they need `await`.
 In R they carry the `obs_` prefix (`obs_query`, `obs_documents`). In Java they are
 static methods of the `Obs` class. In C and C++ they return raw JSON.
 
+The same library, with the same functions, is available inside a script agent.
+Anything you write here can be saved as an agent and run again later without
+opening the Code panel. See section 10.
+
 ### 4.5 HTML and CSS
 
 Choosing HTML or CSS turns the Esegui button into **Anteprima**, and the result
@@ -333,6 +342,10 @@ database, the keys, the data of every user.
 
 Use it **only** in development, on a local machine where you are the only user. On
 a server with multiple accounts, leave it on `docker`.
+
+These same limits apply to script agents, which use this sandbox. An agent adds
+one limit of its own, `OBS_AGENT_TIMEOUT`, which caps the whole run rather than
+the single execution. When the two differ, the stricter one wins.
 
 ---
 
@@ -543,6 +556,13 @@ and retry.
 The script exceeded thirty seconds. Either it has an infinite loop, or it genuinely
 needs more time: in that case raise `CODE_TIMEOUT` in `backend/.env` and restart OBS.
 
+### An agent fails but the same script works here
+
+The agent runs with the permissions of the account that owns it. If you wrote and
+tested the script as a developer and the agent belongs to a normal user, the
+document set is different and so is the result. Check the owner before checking
+the code.
+
 ### The script does not see the documents I expect
 It sees only what you see. If a document does not appear in the Documents tab, it
 will not appear in the script either. This is not a bug.
@@ -582,3 +602,66 @@ docker system prune -a
 ```
 This command **deletes every Docker image on the machine**, not just the OBS ones.
 Use it only if you are sure you do not need them.
+
+
+---
+
+## 10. Running this code as an agent (from v2.6.0)
+
+Everything in this guide applies unchanged inside a script agent. The agent is
+the same sandbox, the same client library and the same limits: what changes is
+that the script is saved, named, and can be run again without opening the Code
+panel.
+
+### Turning a script into an agent
+
+Write and test the script here first. When it does what you want, open the
+**Agents** tab, press **New script**, give it a name, choose the same language,
+and paste the source.
+
+Leave "Give the sandbox an OBS access token" ticked if the script uses the `obs`
+library. That is what injects `OBS_TOKEN` and `OBS_URL` into the container and
+makes the client work, exactly as the Esegui button does here.
+
+### The one real difference: input
+
+An agent can receive a text input when it is run, and by default that text
+arrives on standard input. A script written for the Code panel ignores it and
+keeps working. To use it:
+
+```python
+import sys
+import obs
+
+richiesta = sys.stdin.read().strip()
+if not richiesta:
+    richiesta = "documenti caricati questa settimana"
+
+risultato = obs.query(richiesta, top_k=6)
+for fonte in risultato["chunks"]:
+    print(fonte["titolo"], "|", fonte["azienda"])
+```
+
+Set the input mode to "Ignore input" in the agent form if you prefer the script
+to be fully self contained.
+
+### What an agent cannot do that this panel can
+
+Nothing, on the code side. The sandbox, the network policy and the ephemeral
+token are identical. The difference is only that an agent can also be run on a
+schedule, and that every run is recorded with its output, its errors and its
+duration in the agent history.
+
+### What the token can reach
+
+The token carries the permissions of the agent owner and expires after 120
+seconds. It cannot read documents the owner cannot already see, it cannot reach
+the host filesystem, and it cannot reach the network beyond the OBS endpoint.
+This is the same guarantee described in section 0, and it is the reason a script
+agent is safe to leave enabled.
+
+### Where to go next
+
+Agent registration, the other two agent kinds, the step budget and the periodic
+triggers are documented in section 22 of `COMMAND_GUIDE.md`. This guide covers
+only what you write inside the script.
